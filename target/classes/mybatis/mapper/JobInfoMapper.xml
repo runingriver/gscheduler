@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.gscheduler.dao.task.JobInfoDao">
+    <sql id="jobInfoField">
+        id,job_name,job_class,config_parameter,crontab,initiate_mode,host_list,execute_host,
+        version,execute_status,execute_time,last_execute_time,next_execute_time,
+        update_time
+    </sql>
+
+    <select id="selectAllJobInfo" resultType="JobInfo">
+        SELECT
+        <include refid="jobInfoField"/>
+        FROM job_info
+    </select>
+
+    <select id="selectJobInfoByClassName" resultType="JobInfo">
+        SELECT
+        <include refid="jobInfoField"/>
+        FROM job_info
+        WHERE task_class = #{name}
+    </select>
+
+    <select id="selectJobInfoByHostname" parameterType="string" resultType="JobInfo">
+        SELECT
+        <include refid="jobInfoField"/>
+        FROM job_info
+        WHERE execute_host = #{hostname}
+    </select>
+
+    <select id="selectJobInfoContainHostname" parameterType="string" resultType="JobInfo">
+        SELECT
+        <include refid="jobInfoField"/>
+        FROM job_info
+        WHERE execute_host != #{hostname} AND host_list LIKE CONCAT('%',#{hostname},'%')
+    </select>
+
+    <select id="selectJobInfoById" parameterType="long" resultType="JobInfo">
+        SELECT
+        <include refid="jobInfoField"/>
+        FROM job_info
+        WHERE id=#{id}
+    </select>
+
+    <select id="selectCrontabByTaskClass" resultType="string">
+        SELECT crontab FROM job_info
+        WHERE job_class = #{jobClass}
+    </select>
+
+    <update id="updateJobInfoById">
+        UPDATE job_info
+        <include refid="jobInfoFieldSet"/>
+        WHERE id=#{id}
+    </update>
+
+    <sql id="jobInfoFieldSet">
+        <set>
+            <if test="jobName!=null and jobName!=''">job_name=#{jobName},</if>
+            <if test="jobClass!=null and jobClass!=''">job_class=#{jobClass},</if>
+            <if test="configParameter!=null and configParameter!=''">config_parameter=#{configParameter},</if>
+            <if test="crontab!=null and crontab!=''">crontab=#{crontab},</if>
+            <if test="initiateMode gte 0">initiate_mode=#{initiateMode},</if>
+            <if test="hostList!=null and hostList!=''">host_list=#{hostList},</if>
+            <if test="executeHost!=null and executeHost!=''">execute_host=#{executeHost}</if>
+        </set>
+    </sql>
+
+    <update id="updateVersionAutoAdd">
+        UPDATE job_info
+        SET version = version + 1
+        WHERE id=#{id}
+    </update>
+
+    <update id="updateExecuteTime">
+        UPDATE job_info
+        SET execute_time = #{executeTime,jdbcType=VARCHAR}
+        WHERE id=#{id}
+    </update>
+
+    <update id="updateLastAndNextExecuteTime">
+        UPDATE job_info
+        SET last_execute_time=#{lastExecuteTime,jdbcType=VARCHAR},
+        next_execute_time=#{nextExecuteTime,jdbcType=VARCHAR}
+        WHERE id=#{id}
+    </update>
+
+    <update id="updateInitiateMode">
+        UPDATE job_info
+        SET initiate_mode=#{initiateMode,jdbcType=NUMERIC}
+        WHERE id=#{id} AND initiate_mode != #{initiateMode}
+    </update>
+
+    <update id="updateExecuteStatus">
+        UPDATE job_info
+        SET execute_status=#{executeStatus,jdbcType=NUMERIC}
+        WHERE id=#{id} AND execute_status != #{executeStatus}
+    </update>
+
+
+    <insert id="insertJobInfo" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO job_info
+        <include refid="jobInfoFieldSet"/>
+    </insert>
+
+    <delete id="deleteJobInfoById">
+        DELETE FROM job_info WHERE id=#{id}
+    </delete>
+
+</mapper>
