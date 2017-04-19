@@ -17,6 +17,13 @@
     <!-- 开启注解mvc层的注解 -->
     <mvc:annotation-driven/>
 
+    <mvc:interceptors>
+        <mvc:interceptor>
+            <mvc:mapping path="/task/**"/>
+            <bean class="org.gscheduler.web.filter.OpInterceptor"/>
+        </mvc:interceptor>
+    </mvc:interceptors>
+
     <!-- 视图解析器ViewResolver，用于支持servlet，jsp视图解析-->
     <bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
         <property name="viewClass" value="org.springframework.web.servlet.view.JstlView"/>
