@@ -1,9 +1,5 @@
 package org.gscheduler.web.controller;
 
-import java.util.List;
-
-import javax.annotation.Resource;
-
 import org.gscheduler.entity.JobInfo;
 import org.gscheduler.service.jober.JobManager;
 import org.gscheduler.service.task.JobInfoService;
@@ -14,6 +10,9 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
+
+import javax.annotation.Resource;
+import java.util.List;
 
 /**
  * 任务调度交互控制
@@ -49,16 +48,16 @@ public class JobInfoController {
     // 更新任务
     @RequestMapping(value = "/job/update")
     public String updateJob(@ModelAttribute("jobSchedule") JobInfo jobInfo) {
-        logger.info("手动,更新任务:{}...", jobInfo.getJobName());
+        logger.info("Manually,update the job:{}...", jobInfo.getTaskName());
         // 修改数据库
         trimFields(jobInfo);
         jobInfoService.modifyJobInfo(jobInfo);
-        jobManager.updateSchedule(jobInfo.getId());
+        jobManager.restartSchedule(jobInfo.getId());
         return "redirect:/job/list";
     }
 
     private void trimFields(@ModelAttribute("jobInfo") JobInfo jobInfo) {
-        jobInfo.setJobClass(jobInfo.getJobClass().trim());
+        jobInfo.setTaskClass(jobInfo.getTaskClass().trim());
         jobInfo.setConfigParameter(jobInfo.getConfigParameter().trim());
         jobInfo.setCrontab(jobInfo.getCrontab().trim());
         jobInfo.setHostList(jobInfo.getHostList().trim());
@@ -76,7 +75,7 @@ public class JobInfoController {
     // 删除一个任务记录
     @RequestMapping(value = "/job/delete/{id}")
     public String deleteJob(@PathVariable("id") long id) {
-        logger.info("手动,删除任务:{}...", id);
+        logger.info("Manually,delete the job:{}...", id);
         jobManager.stopSchedule(id);
         jobInfoService.removeJobInfo(id);
         return "redirect:/job/list";
@@ -85,7 +84,7 @@ public class JobInfoController {
     // 停止一个任务
     @RequestMapping(value = "/job/stop/{id}")
     public String stopJob(@PathVariable("id") long id) {
-        logger.info("手动,停止任务:{}...", id);
+        logger.info("Manually, close the job:{}...", id);
         jobManager.stopSchedule(id);
         return "redirect:/job/list";
     }
@@ -93,7 +92,7 @@ public class JobInfoController {
     // 停止所有任务
     @RequestMapping(value = "/job/close/all")
     public String stopAllJob() {
-        logger.info("手动,停止所有任务...");
+        logger.info("Manually, close all the task...");
         jobManager.stopAllScheduler();
         return "redirect:/job/list";
     }
@@ -101,7 +100,7 @@ public class JobInfoController {
     // 立即执行任务
     @RequestMapping(value = "/job/execute/{id}")
     public String executeJob(@PathVariable("id") long id) {
-        logger.info("手动,开启任务:{}...", id);
+        logger.info("Manually, open the job:{}...", id);
         jobManager.startSchedule(id);
         return "redirect:/job/list";
     }

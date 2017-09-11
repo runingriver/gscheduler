@@ -55,12 +55,12 @@
         <!-- 用户名 -->
         <init-param>
             <param-name>loginUsername</param-name>
-            <param-value>sms</param-value>
+            <param-value>admin</param-value>
         </init-param>
         <!-- 密码 -->
         <init-param>
             <param-name>loginPassword</param-name>
-            <param-value>sms</param-value>
+            <param-value>admin</param-value>
         </init-param>
     </servlet>
     <servlet-mapping>

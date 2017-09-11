@@ -5,6 +5,17 @@
        default-lazy-init="true">
     <description>Spring公共配置</description>
 
+    <!-- 定义受环境影响易变的变量,properties文件加载 -->
+    <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="systemPropertiesModeName" value="SYSTEM_PROPERTIES_MODE_OVERRIDE"/>
+        <property name="ignoreResourceNotFound" value="true"/>
+        <property name="locations">
+            <list>
+                <value>classpath:properties/config.properties</value>
+            </list>
+        </property>
+    </bean>
+
     <import resource="classpath:spring/spring-dao.xml"/>
     <import resource="classpath:spring/spring-service.xml"/>
 </beans>

@@ -4,7 +4,7 @@ import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.StringUtils;
-import org.gscheduler.utils.SpringContextHolder;
+import org.gscheduler.commons.SpringContextHolder;
 import org.gscheduler.entity.JobInfo;
 import org.gscheduler.exception.SqlOperationException;
 import org.gscheduler.service.task.JobInfoService;
@@ -24,7 +24,7 @@ class JobScheduler extends AbstractScheduledService {
     private long id;
 
     // 定时任务的信息类
-    private JobInfo taskSchedule;
+    private JobInfo jobInfo;
 
     private JobTrigger jobTrigger;
 
@@ -32,49 +32,49 @@ class JobScheduler extends AbstractScheduledService {
     private JobProcess jobProcess;
 
     // 操作定时任务信息的类
-    private JobInfoService taskScheduleService;
+    private JobInfoService jobInfoService;
 
     /**
      * 用于初始化与任务调度相关的事情 注入类名,使用 spring获取类的实例,类名应该格式为变量命名格式(首字母小写,eg:arrivedMonitor)
      *
      */
-    public boolean init(JobInfo taskSchedule) {
-        if (null == taskSchedule || !checkJobParameter(taskSchedule)) {
+    public boolean init(JobInfo jobInfo) {
+        if (null == jobInfo || !checkJobParameter(jobInfo)) {
             return false;
         }
 
-        this.taskSchedule = taskSchedule;
-        this.id = taskSchedule.getId();
-        logger.info("任务类:{},线程:{}", taskSchedule.getJobClass(), Thread.currentThread().getName());
+        this.jobInfo = jobInfo;
+        this.id = jobInfo.getId();
+        logger.info("任务类:{},线程:{}", jobInfo.getTaskClass(), Thread.currentThread().getName());
         try {
-            jobTrigger = new JobTrigger(taskSchedule.getCrontab());
-            jobProcess = SpringContextHolder.getBean(taskSchedule.getJobClass().trim());
-            taskScheduleService = SpringContextHolder.getBean(JobInfoService.class);
+            jobTrigger = new JobTrigger(jobInfo.getCrontab());
+            jobProcess = SpringContextHolder.getBean(jobInfo.getTaskClass().trim());
+            jobInfoService = SpringContextHolder.getBean(JobInfoService.class);
         } catch (Exception e) {
             logger.error("spring获取bean类实例失败", e);
-            logger.error("丢弃该任务,类名:{}", taskSchedule.getJobClass());
+            logger.error("丢弃该任务,类名:{}", jobInfo.getTaskClass());
             return false;
         }
         return true;
     }
 
     // 检查传进来的TaskSchedule对象是否合法
-    private boolean checkJobParameter(JobInfo taskSchedule) {
-        if (taskSchedule.getId() < 1) {
+    private boolean checkJobParameter(JobInfo jobInfo) {
+        if (jobInfo.getId() < 1) {
             logger.error("任务初始化失败,未获取到TaskSchedule id.");
             return false;
         }
-        if (StringUtils.isBlank(taskSchedule.getJobClass())) {
+        if (StringUtils.isBlank(jobInfo.getTaskClass())) {
             logger.error("任务初始化失败,未获取到TaskClass.");
             return false;
         }
-        if (StringUtils.isBlank(taskSchedule.getCrontab())) {
+        if (StringUtils.isBlank(jobInfo.getCrontab())) {
             logger.error("任务初始化失败,未获取到Crontab.");
             return false;
         }
 
-        if (JobTrigger.checkExpression(taskSchedule.getCrontab())) {
-            logger.error("任务初始化失败,时间表达式错误:{}", taskSchedule.getCrontab());
+        if (JobTrigger.checkExpression(jobInfo.getCrontab())) {
+            logger.error("任务初始化失败,时间表达式错误:{}", jobInfo.getCrontab());
             return false;
         }
 
@@ -83,7 +83,7 @@ class JobScheduler extends AbstractScheduledService {
 
     @Override
     protected String serviceName() {
-        return taskSchedule.getJobClass() + "thread-" + threadCount.incrementAndGet();
+        return jobInfo.getTaskClass() + "thread-" + threadCount.incrementAndGet();
     }
 
     /**
@@ -106,7 +106,7 @@ class JobScheduler extends AbstractScheduledService {
     @Override
     protected void startUp() throws Exception {
         logger.info("调度器线程:{},开始执行", Thread.currentThread().getName());
-        taskScheduleService.modifyInitiateMode(id, JobManager.AVAILABLE);
+        jobInfoService.modifyInitiateMode(id, JobManager.AVAILABLE);
     }
 
     /**
@@ -119,9 +119,9 @@ class JobScheduler extends AbstractScheduledService {
         logger.info("开始执行任务,执行任务线程:{}", Thread.currentThread().getName());
         boolean succeed = false;
         try {
-            taskScheduleService.modifyExecuteTime(id, "running");
+            jobInfoService.modifyExecuteTime(id, "running");
             // 下一次执行时间
-            taskScheduleService.modifyLastAndNextExecuteTime(id, new Date(), jobTrigger.getNextExecutionDate());
+            jobInfoService.modifyLastAndNextExecuteTime(id, new Date(), jobTrigger.getNextExecutionDate());
             Stopwatch stopwatch = Stopwatch.createStarted();
 
             jobProcess.execute();
@@ -129,7 +129,7 @@ class JobScheduler extends AbstractScheduledService {
             stopwatch.stop();
             String executeTime = stopwatch.toString();
             logger.info("任务执行时长:{}", executeTime);
-            taskScheduleService.modifyExecuteTime(id, executeTime);
+            jobInfoService.modifyExecuteTime(id, executeTime);
             // 执行到此处代表上面执行正常
             succeed = true;
         } catch (Throwable e) {
@@ -138,7 +138,7 @@ class JobScheduler extends AbstractScheduledService {
 
         if (!succeed) {
             try {
-                taskScheduleService.modifyExecuteTime(id, "failed");
+                jobInfoService.modifyExecuteTime(id, "failed");
             } catch (SqlOperationException e) {
                 logger.error("update execute time exception", e);
             }
@@ -150,7 +150,7 @@ class JobScheduler extends AbstractScheduledService {
      */
     @Override
     protected Scheduler scheduler() {
-        logger.info("Scheduler 线程:{},cron:{}", Thread.currentThread().getName(), taskSchedule.getCrontab());
+        logger.info("Scheduler 线程:{},cron:{}", Thread.currentThread().getName(), jobInfo.getCrontab());
         return jobTrigger.getScheduler();
         // return Scheduler.newFixedRateSchedule(delay, period, TimeUnit.MINUTES);
     }
@@ -165,7 +165,7 @@ class JobScheduler extends AbstractScheduledService {
 
     @Override
     public String toString() {
-        return MoreObjects.toStringHelper(this.getClass()).addValue(taskSchedule).add("State:", this.state())
+        return MoreObjects.toStringHelper(this.getClass()).addValue(jobInfo).add("State:", this.state())
                 .toString();
     }
 }

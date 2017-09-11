@@ -10,9 +10,15 @@ import com.google.common.base.MoreObjects;
 public class JobInfo {
     private long id;
     // 任务名称
-    private String jobName;
+    private String taskName;
     // 任务调用的类名
-    private String jobClass;
+    private String taskClass;
+    //依赖调度,父调度任务名taskName,仅做标识
+    private String parentName;
+    //依赖调度,子任务的id集合
+    private String subTask;
+    //任务执行version,父task通知子task
+    private long taskVersion;
     // 任务配置参数
     private String configParameter;
     // 任务执行时间正则,参考cron
@@ -23,6 +29,8 @@ public class JobInfo {
     private String hostList;
     // 指定执行的机器
     private String executeHost;
+    //failover执行机器
+    private String failExecuteHost;
     // 用作保证任务运行
     private long version;
     // 任务执行情况,-1:未执行,0:执行失败,1:运行中,2:成功
@@ -35,6 +43,38 @@ public class JobInfo {
     private Date nextExecuteTime;
     // 任务操作时间
     private Date updateTime;
+
+    public String getTaskClass() {
+        return taskClass;
+    }
+
+    public void setTaskClass(String taskClass) {
+        this.taskClass = taskClass;
+    }
+
+    public String getParentName() {
+        return parentName;
+    }
+
+    public void setParentName(String parentName) {
+        this.parentName = parentName;
+    }
+
+    public String getSubTask() {
+        return subTask;
+    }
+
+    public void setSubTask(String subTask) {
+        this.subTask = subTask;
+    }
+
+    public long getTaskVersion() {
+        return taskVersion;
+    }
+
+    public void setTaskVersion(long taskVersion) {
+        this.taskVersion = taskVersion;
+    }
 
     public short getExecuteStatus() {
         return executeStatus;
@@ -74,6 +114,14 @@ public class JobInfo {
 
     public void setExecuteHost(String executeHost) {
         this.executeHost = executeHost;
+    }
+
+    public String getFailExecuteHost() {
+        return failExecuteHost;
+    }
+
+    public void setFailExecuteHost(String failExecuteHost) {
+        this.failExecuteHost = failExecuteHost;
     }
 
     public String getHostList() {
@@ -124,6 +172,14 @@ public class JobInfo {
         this.nextExecuteTime = nextExecuteTime;
     }
 
+    public String getTaskName() {
+        return taskName;
+    }
+
+    public void setTaskName(String taskName) {
+        this.taskName = taskName;
+    }
+
     public Date getUpdateTime() {
         return updateTime;
     }
@@ -132,32 +188,21 @@ public class JobInfo {
         this.updateTime = updateTime;
     }
 
-    public String getJobClass() {
-        return jobClass;
-    }
-
-    public void setJobClass(String jobClass) {
-        this.jobClass = jobClass;
-    }
-
-    public String getJobName() {
-        return jobName;
-    }
-
-    public void setJobName(String jobName) {
-        this.jobName = jobName;
-    }
-
-    @Override public String toString() {
+    @Override
+    public String toString() {
         return "JobInfo{" +
                 "configParameter='" + configParameter + '\'' +
                 ", id=" + id +
-                ", jobName='" + jobName + '\'' +
-                ", jobClass='" + jobClass + '\'' +
+                ", taskName='" + taskName + '\'' +
+                ", taskClass='" + taskClass + '\'' +
+                ", parentName='" + parentName + '\'' +
+                ", subTask='" + subTask + '\'' +
+                ", taskVersion=" + taskVersion +
                 ", crontab='" + crontab + '\'' +
                 ", initiateMode=" + initiateMode +
                 ", hostList='" + hostList + '\'' +
                 ", executeHost='" + executeHost + '\'' +
+                ", failExecuteHost='" + failExecuteHost + '\'' +
                 ", version=" + version +
                 ", executeStatus=" + executeStatus +
                 ", executeTime='" + executeTime + '\'' +

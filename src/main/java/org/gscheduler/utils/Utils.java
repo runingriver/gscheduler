@@ -1,16 +1,15 @@
 package org.gscheduler.utils;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.Date;
-
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Date;
 
 public class Utils {
     private static final Logger logger = LoggerFactory.getLogger(Utils.class);
@@ -29,7 +28,7 @@ public class Utils {
         try {
             hostName = InetAddress.getLocalHost().getHostName();
         } catch (UnknownHostException e) {
-            logger.error("获取主机名失败!", e);
+            logger.error("get the host name failure.!", e);
         }
 
         return hostName;
@@ -90,9 +89,9 @@ public class Utils {
     /**
      * 将Date转为String
      *
-     * @param date Date
+     * @param date         Date
      * @param defaultValue 默认时间
-     * @param format null-yyyy-MM-dd HH:mm:ss
+     * @param format       null-yyyy-MM-dd HH:mm:ss
      * @return
      */
     public static String dateToString(Date date, String defaultValue, String format) {
@@ -117,5 +116,7 @@ public class Utils {
         DateTime dateTime = new DateTime(date);
         return dateTime.toString(format);
     }
+
+
 
 }

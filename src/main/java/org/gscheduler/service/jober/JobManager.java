@@ -1,26 +1,25 @@
 package org.gscheduler.service.jober;
 
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-
-import javax.annotation.Resource;
-
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.Service;
 import org.apache.commons.lang3.StringUtils;
+import org.gscheduler.commons.SpringContextHolder;
 import org.gscheduler.entity.JobInfo;
 import org.gscheduler.service.task.JobInfoService;
-import org.gscheduler.utils.SpringContextHolder;
 import org.gscheduler.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.Service;
+import javax.annotation.Resource;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * 作业管理类,任务启动,关闭,停止.
@@ -28,18 +27,44 @@ import com.google.common.util.concurrent.Service;
 @Component
 public class JobManager {
     private static final Logger logger = LoggerFactory.getLogger(JobManager.class);
-    /** 启用状态 */
+    /**
+     * 任务状态:启用状态
+     */
     public static final short AVAILABLE = 1;
-    /** 禁用状态 */
+    /**
+     * 任务状态:禁用状态
+     */
     public static final short DISABLE = 0;
-    /** 未执行 */
-    private static final short UN_EXECUTE = -1;
-    /** 执行失败 */
-    private static final short FAILED_EXECUTE = 0;
-    /** 运行中 */
-    private static final short IN_EXECUTE = 1;
-    /** 执行成功 */
+    /**
+     * 任务执行状态:未执行
+     */
+    public static final short UN_EXECUTE = -1;
+    /**
+     * 任务执行状态:执行失败
+     */
+    public static final short FAILED_EXECUTE = 0;
+    /**
+     * 任务执行状态:运行中
+     */
+    public static final short IN_EXECUTE = 1;
+    /**
+     * 任务执行状态:执行成功
+     */
     public static final short SUCCESS_EXECUTE = 2;
+
+    /**
+     * 是否使用zk监听任务
+     */
+    public boolean isUsedZKListener = true;
+
+    /**
+     * STOP_OR_START:主机改变,一台主机关闭,一台主机启动
+     * KILL:kill掉任务
+     */
+    public enum JobOperator {
+        STOP, START, RESTART, STOP_OR_START, KILL, NONE
+    }
+
 
     @Resource
     JobInfoService jobInfoService;
@@ -47,28 +72,52 @@ public class JobManager {
     @Resource
     JobWatcher jobWatcher;
 
+    @Resource
+    JobListener jobListener;
+
+    @Value("zookeeper.use.task.listener")
+    String isUseZookeeper;
+
     /**
-     * 多个线程会同事操作该Map,只存放正在运行的JobScheduler
+     * 多个线程会同时操作该Map,只存放正在运行的JobScheduler,key-id,value-obj
      */
-    private final Map<Long, JobScheduler> jobSchedulerMaps = Maps.newConcurrentMap();
+    private final Map<Long, JobScheduler> jobSchedulerMaps = new ConcurrentHashMap<>(50);
 
-    private final ExecutorService jobLisenter = Executors.newFixedThreadPool(5,
-            new NamedThreadFactory("job-listener"));
+    //监听job线程执行状态的线程池
+    private ExecutorService listenerService;
 
     /**
-     * 初始化开始,启动定时任务
+     * 初始化开始,启动定时任务,系统启动执行
      */
     public void init() {
+        isUsedZKListener = Boolean.parseBoolean(isUseZookeeper);
+        //执行任务监听
+        listenerService = Executors.newSingleThreadExecutor(new NamedThreadFactory("job-listener"));
+
         List<JobInfo> allJobInfo = jobInfoService.getAllJobInfo();
-        for (JobInfo taskSchedule : allJobInfo) {
+        for (JobInfo jobInfo : allJobInfo) {
             // 如果任务是未启用的,不初始化
-            if (taskSchedule.getInitiateMode() != AVAILABLE) {
+            if (jobInfo.getInitiateMode() != AVAILABLE) {
                 continue;
             }
-            initJobScheduler(taskSchedule);
+            if (!checkHostName(jobInfo.getExecuteHost())) {
+                logger.error("任务不属于本机执行.执行任务主机:{}", jobInfo.getExecuteHost());
+                continue;
+            }
+            //更新failExecuteHost
+            if (StringUtils.equals(jobInfo.getFailExecuteHost(), Utils.getHostName())) {
+                jobInfoService.modifyFailExecuteHost(jobInfo.getId(), "");
+            }
+
+            if (StringUtils.isNotBlank(jobInfo.getParentName())) {
+                continue;
+            }
+
+            JobScheduler jobScheduler = initJobScheduler(jobInfo);
+
+            //启动不是依赖调度的任务,依赖调度的任务不启动
+            jobScheduler.startAsync().awaitRunning();
         }
-        // 初始化任务管理器,并开始执行任务
-        initStartAllJobScheduler();
 
         // 查看任务的健康状态,处理心跳
         logger.info("开启监控线程...");
@@ -78,36 +127,19 @@ public class JobManager {
     /**
      * 初始化一个定时任务
      */
-    private JobScheduler initJobScheduler(final JobInfo taskSchedule) {
+    public JobScheduler initJobScheduler(final JobInfo jobInfo) {
         JobScheduler jobScheduler = new JobScheduler();
         // 设置调度器基本参数
-        boolean isIllegal = setJobSchedulerParameter(jobScheduler, taskSchedule);
-        if (!isIllegal) {
+        if (!jobScheduler.init(jobInfo)) {
+            logger.info("初始化{}失败.", jobInfo.getTaskName());
             return null;
         }
 
-        // 如果参数合法,放人容器管理
-        jobSchedulerMaps.put(taskSchedule.getId(), jobScheduler);
-        // 添加监听器,设置线程名,如果线程紧张可以改用线程池执行
-        jobScheduler.addListener(new ScheduleListener(taskSchedule), jobLisenter);
-
+        // 如果初始化成功,放入容器管理
+        jobSchedulerMaps.put(jobInfo.getId(), jobScheduler);
+        // 添加监听器
+        jobScheduler.addListener(new ScheduleListener(jobInfo), listenerService);
         return jobScheduler;
-    }
-
-    /**
-     * 设置调度器的执行参数,并检查参数合法性,检查是否指定改主机执行.
-     *
-     * @return true-合法,false-不合法
-     */
-    private boolean setJobSchedulerParameter(JobScheduler jobScheduler, JobInfo taskSchedule) {
-        // 检查是否指定在本机上执行
-        if (!checkHostName(taskSchedule.getExecuteHost())) {
-            logger.error("任务不属于本机执行.执行任务主机:{}", taskSchedule.getExecuteHost());
-            return false;
-        }
-
-        // 初始化jobScheduler必要参数
-        return jobScheduler.init(taskSchedule);
     }
 
     /**
@@ -125,19 +157,6 @@ public class JobManager {
     }
 
     /**
-     * 初始化启动所有定时任务
-     */
-    private void initStartAllJobScheduler() {
-        if (jobSchedulerMaps.isEmpty()) {
-            logger.info("没有定时任务可开启");
-        }
-
-        for (JobScheduler jobScheduler : jobSchedulerMaps.values()) {
-            jobScheduler.startAsync().awaitRunning();
-        }
-    }
-
-    /**
      * 启动一个已经停止的任务 更新initiateMode=1启用
      *
      * @param id 存储于数据库的任务id
@@ -151,26 +170,27 @@ public class JobManager {
         }
 
         // 移除JobScheduler
-        jobSchedulerMaps.remove(id);
-        jobInfoService.modifyInitiateMode(id, AVAILABLE);
+        if (jobSchedulerMaps.containsKey(id)) {
+            jobSchedulerMaps.remove(id);
+        }
         // 从数据库中获取并启动
         getAndStartNewJobScheduler(id);
     }
 
     /**
      * 重启任务,将任务关闭,然后重新加载
-     *
      */
     public void restartSchedule(long id) {
         Preconditions.checkArgument(id > 0, "id illegal.");
-        logger.info("线程:{},重启任务{}定时任务 ", Thread.currentThread().getName(), id);
+        logger.info("线程:{},重启任务,id:{}", Thread.currentThread().getName(), id);
         JobScheduler jobScheduler = jobSchedulerMaps.get(id);
         if (null == jobScheduler) {
-            logger.error("未获取到该任务,id:{}", id);
+            logger.warn("该任务未启动,启动任务,id:{}", id);
+            getAndStartNewJobScheduler(id);
             return;
         }
-        logger.info("重启的定时任务,当前执行状态:{}", jobScheduler.state());
 
+        logger.info("任务已启动,关闭并重启任务,当前执行状态:{}", jobScheduler.state());
         // 关闭任务
         try {
             jobScheduler.stopAsync().awaitTerminated();
@@ -184,7 +204,6 @@ public class JobManager {
 
     /**
      * 冲数据库中获取,并启动一个新的定时任务
-     *
      */
     private void getAndStartNewJobScheduler(long id) {
         // 获取定时任务信息
@@ -203,7 +222,7 @@ public class JobManager {
         // 初始化任务,并加入到Map容器中
         JobScheduler restartJobScheduler = initJobScheduler(taskScheduleById);
         if (null == restartJobScheduler) {
-            logger.error("初始化任务({})调度器失败.", taskScheduleById.getJobName());
+            logger.error("初始化任务({})调度器失败.", taskScheduleById.getTaskName());
             return;
         }
 
@@ -218,53 +237,47 @@ public class JobManager {
     }
 
     /**
-     * 关闭任务 更新initiateMode=1,未启用
+     * 关闭任务 更新initiateMode=0,未启用
      */
-    public void stopSchedule(long id) {
+    public boolean stopSchedule(long id) {
         Preconditions.checkArgument(id > 0, "id illegal.");
         JobScheduler jobScheduler = jobSchedulerMaps.get(id);
-        // 将可用状态置为,不可用
-        jobInfoService.modifyInitiateMode(id, DISABLE);
         // 从map中没有获取到任务,说明该任务没有执行
         if (null == jobScheduler) {
             logger.info("任务不处于执行状态,id:{}", id);
-            return;
+            return false;
         }
 
         try {
             jobScheduler.stopAsync().awaitTerminated();
         } catch (IllegalStateException e) {
             logger.error("停止任务失败,id:{},JobScheduler:{}", id, jobScheduler.toString());
-            return;
+            return false;
         }
         logger.info("任务关闭成功,State:{}", jobScheduler.state());
         // 更新任务状态为未执行
         jobInfoService.modifyExecuteStatus(id, UN_EXECUTE);
         jobSchedulerMaps.remove(id);
         // tip:更新数据库状态在JobScheduler中的shutDown中执行
+        return true;
     }
 
-    /**
-     * 更新定时任务
-     *
-     * @param id 与数据库对应的调度任务的主键id
-     */
-    public void updateSchedule(long id) {
+    public void killSchedule(long id) {
         Preconditions.checkArgument(id > 0, "id illegal.");
-        // 首先判断是否是正在执行,是:关闭,剔除.
         JobScheduler jobScheduler = jobSchedulerMaps.get(id);
-        if (null != jobScheduler) {
-            try {
-                jobScheduler.stopAsync().awaitTerminated();
-            } catch (IllegalStateException e) {
-                logger.error("停止任务失败,id:{},JobScheduler:{}", id, jobScheduler.toString());
-                return;
-            }
-            // map容器移除,并重置为启用状态
-            jobSchedulerMaps.remove(id);
+        // 从map中没有获取到任务,说明该任务没有执行
+        if (null == jobScheduler) {
+            logger.info("任务不处于执行状态,id:{}", id);
+            return;
         }
 
-        getAndStartNewJobScheduler(id);
+        jobSchedulerMaps.remove(id);
+        try {
+            jobScheduler.stopAsync().awaitTerminated();
+        } catch (IllegalStateException e) {
+            logger.error("停止任务失败,id:{},JobScheduler:{}", id, jobScheduler.toString());
+        }
+        logger.info("任务kill成功,State:{}", jobScheduler.state());
     }
 
     public void stopAllScheduler() {
@@ -289,6 +302,8 @@ public class JobManager {
             } catch (RuntimeException e) {
                 logger.error("更新任务状态失败,JobScheduler:{}", jobScheduler.toString());
             }
+            jobScheduler.stopAsync().awaitTerminated();
+            logger.info("{} stop,Job:{}", jobScheduler.serviceName(), jobScheduler.toString());
         }
     }
 
@@ -297,16 +312,31 @@ public class JobManager {
         return immutableJobMap;
     }
 
+    public boolean getIsUsedZKListener() {
+        return isUsedZKListener;
+    }
+
+    public void setIsUsedZKListener(boolean isUsed) {
+        isUsedZKListener = isUsed;
+        //关闭,启动
+        if (isUsedZKListener && !jobListener.isInListening()) {
+            jobListener.init();
+        }
+        if (!isUsedZKListener && jobListener.isInListening()) {
+            jobListener.close();
+        }
+    }
+
     /**
      * 监听定时任务执行状态,并实时更新数据库
      */
     private static class ScheduleListener extends Service.Listener {
-        private JobInfo taskSchedule;
+        private JobInfo jobInfo;
         JobInfoService jobInfoService;
 
-        ScheduleListener(JobInfo taskSchedule) {
+        ScheduleListener(JobInfo jobInfo) {
             super();
-            this.taskSchedule = taskSchedule;
+            this.jobInfo = jobInfo;
             init();
         }
 
@@ -319,9 +349,9 @@ public class JobManager {
          */
         @Override
         public void failed(Service.State from, Throwable failure) {
-            logger.info("Listener: {}任务执行失败 State:{},exception:{}", taskSchedule.getJobName(), from.toString(),
+            logger.info("Listener: {}任务执行失败 State:{},exception:{}", jobInfo.getTaskName(), from.toString(),
                     failure);
-            jobInfoService.modifyExecuteStatus(taskSchedule.getId(), FAILED_EXECUTE);
+            jobInfoService.modifyExecuteStatus(jobInfo.getId(), FAILED_EXECUTE);
         }
 
         /**
@@ -329,24 +359,24 @@ public class JobManager {
          */
         @Override
         public void running() {
-            logger.info("Listener:任务开始运行,线程:{}", Thread.currentThread().getName());
-            jobInfoService.modifyExecuteStatus(taskSchedule.getId(), IN_EXECUTE);
+            logger.info("Listener:{} 开始运行,监听线程:{}", jobInfo.getTaskName(), Thread.currentThread().getName());
+            jobInfoService.modifyExecuteStatus(jobInfo.getId(), IN_EXECUTE);
         }
 
         @Override
         public void starting() {
-            logger.info("Listener:{}任务启动,当前监听定时任务线程:{}", taskSchedule.getJobName(), Thread.currentThread().getName());
+            logger.info("Listener:{}任务启动,当前监听定时任务线程:{}", jobInfo.getTaskName(), Thread.currentThread().getName());
         }
 
         /**
          * 执行状态executeStatus=-1(未执行)
-         * 
+         *
          * @param from 只可能有两种状态:RUNNING,STARTING
          */
         @Override
         public void stopping(Service.State from) {
-            logger.info("Listener: 任务开始停止,线程:{}", Thread.currentThread().getName());
-            jobInfoService.modifyExecuteStatus(taskSchedule.getId(), UN_EXECUTE);
+            logger.info("Listener: {}开始停止,线程:{}", jobInfo.getTaskName(), Thread.currentThread().getName());
+            jobInfoService.modifyExecuteStatus(jobInfo.getId(), UN_EXECUTE);
         }
 
         /**
@@ -367,9 +397,10 @@ public class JobManager {
         private final String threadName;
 
         public NamedThreadFactory(String threadName) {
-            this.threadName = threadName + "-thread-" + JobScheduler.threadCount.incrementAndGet();
+            this.threadName = threadName + "-pool-thread-" + JobScheduler.threadCount.incrementAndGet();
         }
 
+        @Override
         public Thread newThread(Runnable r) {
             return new Thread(r, threadName);
         }
