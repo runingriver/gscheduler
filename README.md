@@ -32,3 +32,7 @@ eg:(1/min 5/min,延迟1分钟后执行,每5分钟执行一次),(1/hour,2/day)延
 
 # 备注
 工作之中有感而发,尚且是我闲暇之余的重复造轮子!for up,for open source!
+
+# 简单示例截图
+
+![image](https://github.com/runingriver/gscheduler/blob/master/images/gschedule_demo.png)
