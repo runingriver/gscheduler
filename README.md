@@ -18,9 +18,11 @@ gscheduler特点如下:
 2. 暂未支持依赖调度.
 
 # 运行
-无需配置,jdk1.7+maven可以直接运行！
+1. 无需配置,jdk1.7+maven可以直接运行！
 cd到工程目录,命令行运行: mvn clean tomcat:run
 访问：http://localhost:8080/gscheduler/job/list
+2. idea运行,clone下来后,配置`Edit Configuration...`,然后直接运行.
+如果,需要多台机器运行,启动zk,实现一致性,配置`config.properties`中相关参数!
 
 # 使用
 1. 继承JobProcess类,实现execute方法,在execute方法中填入业务逻辑,添加@Component注解将类交给spring管理.
