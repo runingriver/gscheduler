@@ -33,6 +33,12 @@ eg:(1/min 5/min,延迟1分钟后执行,每5分钟执行一次),(1/hour,2/day)延
 # 备注
 工作之中有感而发,尚且是我闲暇之余的重复造轮子!for up,for open source!
 
+# 后续计划
+1. 提供基于注解的任务定义模式
+2. 重写内核,使得其不再依赖guava,不强依赖spring.
+3. 实现任务依赖调度
+4. 实现任务执行日志
+
 # 简单示例截图
 
 ![image](https://github.com/runingriver/gscheduler/blob/master/images/gschedule_demo.png)
