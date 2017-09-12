@@ -1,4 +1,4 @@
-package org.gscheduler.service.jober;
+package org.gscheduler.service.executor;
 
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -45,14 +45,14 @@ class JobScheduler extends AbstractScheduledService {
 
         this.jobInfo = jobInfo;
         this.id = jobInfo.getId();
-        logger.info("任务类:{},线程:{}", jobInfo.getTaskClass(), Thread.currentThread().getName());
+        logger.info("任务类:{},线程:{}", jobInfo.getJobClass(), Thread.currentThread().getName());
         try {
             jobTrigger = new JobTrigger(jobInfo.getCrontab());
-            jobProcess = SpringContextHolder.getBean(jobInfo.getTaskClass().trim());
+            jobProcess = SpringContextHolder.getBean(jobInfo.getJobClass().trim());
             jobInfoService = SpringContextHolder.getBean(JobInfoService.class);
         } catch (Exception e) {
             logger.error("spring获取bean类实例失败", e);
-            logger.error("丢弃该任务,类名:{}", jobInfo.getTaskClass());
+            logger.error("丢弃该任务,类名:{}", jobInfo.getJobClass());
             return false;
         }
         return true;
@@ -64,7 +64,7 @@ class JobScheduler extends AbstractScheduledService {
             logger.error("任务初始化失败,未获取到TaskSchedule id.");
             return false;
         }
-        if (StringUtils.isBlank(jobInfo.getTaskClass())) {
+        if (StringUtils.isBlank(jobInfo.getJobClass())) {
             logger.error("任务初始化失败,未获取到TaskClass.");
             return false;
         }
@@ -83,7 +83,7 @@ class JobScheduler extends AbstractScheduledService {
 
     @Override
     protected String serviceName() {
-        return jobInfo.getTaskClass() + "thread-" + threadCount.incrementAndGet();
+        return jobInfo.getJobClass() + "thread-" + threadCount.incrementAndGet();
     }
 
     /**

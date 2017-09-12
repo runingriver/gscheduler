@@ -1,4 +1,4 @@
-package org.gscheduler.service.jober;
+package org.gscheduler.service.executor;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -75,7 +75,7 @@ public class JobManager {
     @Resource
     JobListener jobListener;
 
-    @Value("zookeeper.use.task.listener")
+    @Value("${zookeeper.use.task.listener}")
     String isUseZookeeper;
 
     /**
@@ -91,6 +91,8 @@ public class JobManager {
      */
     public void init() {
         isUsedZKListener = Boolean.parseBoolean(isUseZookeeper);
+        logger.info("do not use zookeeper keep consistence on startup,isUsedZKListener:{},properties value:{}",
+                isUsedZKListener, isUseZookeeper);
         //执行任务监听
         listenerService = Executors.newSingleThreadExecutor(new NamedThreadFactory("job-listener"));
 
@@ -131,7 +133,7 @@ public class JobManager {
         JobScheduler jobScheduler = new JobScheduler();
         // 设置调度器基本参数
         if (!jobScheduler.init(jobInfo)) {
-            logger.info("初始化{}失败.", jobInfo.getTaskName());
+            logger.info("初始化{}失败.", jobInfo.getJobName());
             return null;
         }
 
@@ -222,7 +224,7 @@ public class JobManager {
         // 初始化任务,并加入到Map容器中
         JobScheduler restartJobScheduler = initJobScheduler(taskScheduleById);
         if (null == restartJobScheduler) {
-            logger.error("初始化任务({})调度器失败.", taskScheduleById.getTaskName());
+            logger.error("初始化任务({})调度器失败.", taskScheduleById.getJobName());
             return;
         }
 
@@ -349,7 +351,7 @@ public class JobManager {
          */
         @Override
         public void failed(Service.State from, Throwable failure) {
-            logger.info("Listener: {}任务执行失败 State:{},exception:{}", jobInfo.getTaskName(), from.toString(),
+            logger.info("Listener: {}任务执行失败 State:{},exception:{}", jobInfo.getJobName(), from.toString(),
                     failure);
             jobInfoService.modifyExecuteStatus(jobInfo.getId(), FAILED_EXECUTE);
         }
@@ -359,13 +361,13 @@ public class JobManager {
          */
         @Override
         public void running() {
-            logger.info("Listener:{} 开始运行,监听线程:{}", jobInfo.getTaskName(), Thread.currentThread().getName());
+            logger.info("Listener:{} 开始运行,监听线程:{}", jobInfo.getJobName(), Thread.currentThread().getName());
             jobInfoService.modifyExecuteStatus(jobInfo.getId(), IN_EXECUTE);
         }
 
         @Override
         public void starting() {
-            logger.info("Listener:{}任务启动,当前监听定时任务线程:{}", jobInfo.getTaskName(), Thread.currentThread().getName());
+            logger.info("Listener:{}任务启动,当前监听定时任务线程:{}", jobInfo.getJobName(), Thread.currentThread().getName());
         }
 
         /**
@@ -375,7 +377,7 @@ public class JobManager {
          */
         @Override
         public void stopping(Service.State from) {
-            logger.info("Listener: {}开始停止,线程:{}", jobInfo.getTaskName(), Thread.currentThread().getName());
+            logger.info("Listener: {}开始停止,线程:{}", jobInfo.getJobName(), Thread.currentThread().getName());
             jobInfoService.modifyExecuteStatus(jobInfo.getId(), UN_EXECUTE);
         }
 

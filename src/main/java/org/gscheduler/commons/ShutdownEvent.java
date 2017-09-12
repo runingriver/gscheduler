@@ -1,6 +1,6 @@
 package org.gscheduler.commons;
 
-import org.gscheduler.service.jober.JobManager;
+import org.gscheduler.service.executor.JobManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationListener;
@@ -26,8 +26,9 @@ public class ShutdownEvent implements ApplicationListener<ContextClosedEvent> {
         if (isShutDown) {
             return;
         }
-        logger.info("服务开始关闭...");
+        logger.info("任务调度,服务开始关闭.");
         jobManager.shutdown();
+        logger.info("任务调度,服务关闭完成.");
         isShutDown = true;
     }
 }

@@ -1,11 +1,11 @@
 DROP TABLE IF EXISTS job_info;
 CREATE TABLE job_info(
   id INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键id',
-  task_name VARCHAR(30) NOT NULL DEFAULT '' COMMENT '任务执行名称',
-  task_class VARCHAR(30) NOT NULL DEFAULT '' COMMENT '任务调用的类名',
+  job_name VARCHAR(30) NOT NULL DEFAULT '' COMMENT '任务执行名称',
+  job_class VARCHAR(30) NOT NULL DEFAULT '' COMMENT '任务调用的类名',
   parent_name VARCHAR(255) NOT NULL DEFAULT '' COMMENT '任务调用的类名',
-  sub_task VARCHAR(255) NOT NULL DEFAULT '' COMMENT '任务调用的类名',
-  job_version VARCHAR(255) NOT NULL DEFAULT '' COMMENT '任务调用的类名',
+  sub_job VARCHAR(255) NOT NULL DEFAULT '' COMMENT '任务调用的类名',
+  job_version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '任务调用的类名',
   config_parameter VARCHAR(255) NOT NULL DEFAULT '' COMMENT '任务配置参数',
   crontab VARCHAR(50) NOT NULL DEFAULT '' COMMENT '执行时间的正则',
   initiate_mode TINYINT NOT NULL DEFAULT 0 COMMENT '任务启用情况,1-启用,0-禁用',
@@ -20,8 +20,10 @@ CREATE TABLE job_info(
   description VARCHAR(255) NOT NULL DEFAULT '' COMMENT '任务描述',
   update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '最后更新时间',
   PRIMARY KEY (id),
-  UNIQUE KEY uniq_task_name (task_name)
+  UNIQUE KEY uniq_job_name (job_name)
 );
 
-INSERT INTO job_info (task_name, task_class, crontab, initiate_mode, host_list, execute_host, execute_status , description)
-    VALUES ('demo job','demoJob','30 */5 * * * *',1,'zongzhe','zongzhe','1','测试任务');
+-- 将localhost名改为本机名,让任务在本地运行
+ INSERT INTO job_info (job_name, job_class, crontab, initiate_mode, host_list, execute_host, execute_status , description)
+     VALUES ('demo_job','demoJob','30 */5 * * * *',1,'localhost','localhost','1','测试任务'),
+       ('test job','testJob','1/min 3/min',1,'localhost','localhost',1,'my_test_job');

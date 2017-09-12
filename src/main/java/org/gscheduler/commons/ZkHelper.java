@@ -34,7 +34,7 @@ public class ZkHelper {
 
     private volatile Map<String, ZKClient> clientMap = Maps.newConcurrentMap();
 
-    @Value("zookeeper.address")
+    @Value("${zookeeper.address}")
     String connectionUrl;
 
     @PreDestroy
@@ -236,9 +236,9 @@ public class ZkHelper {
         /**
          * 监听Node节点中数据改变事件,自动重复监听
          *
-         * @param path
-         * @param listener
-         * @return
+         * @param path path
+         * @param listener listener
+         * @return boolean
          */
         public boolean setNodeCacheListener(String path, NodeCacheListener listener) {
             if (!checkNodeExisted(path)) {

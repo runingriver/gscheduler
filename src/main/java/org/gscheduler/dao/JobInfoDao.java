@@ -1,4 +1,4 @@
-package org.gscheduler.dao.task;
+package org.gscheduler.dao;
 
 import org.apache.ibatis.annotations.Param;
 import org.gscheduler.entity.JobInfo;
@@ -15,6 +15,13 @@ public interface JobInfoDao {
      */
     List<JobInfo> selectAllJobInfo();
 
+    /**
+     * failover时获取可处理的任务
+     * 通常executeHost宕机后,本机尝试去获取包含本机的host list
+     * @param localHost 本地主机名
+     * @param executeHost 执行主机名
+     * @return List
+     */
     List<JobInfo> selectJobInfoForFailover(@Param("localHost") String localHost, @Param("executeHost") String executeHost);
 
     /**
@@ -43,19 +50,19 @@ public interface JobInfoDao {
     /**
      * 查询任务的cron表达式
      *
-     * @param jobClass TaskClass
+     * @param jobClass jobClass
      * @return String
      */
-    String selectCrontabByTaskClass(String jobClass);
+    String selectCrontabByJobClass(String jobClass);
 
-    JobInfo selectJobInfoByTaskName(String taskName);
+    JobInfo selectJobInfoByJobName(String jobName);
 
     /**
-     * 根据id更新TaskShecdule 不更新executeTime,lastExecuteTime,nextExecuteTime
+     * 根据id更新JobInfo 不更新executeTime,lastExecuteTime,nextExecuteTime
      */
     Integer updateJobInfoById(JobInfo jobInfo);
 
-    Integer updateTaskVersion(@Param("id") long id);
+    Integer updateJobVersion(@Param("id") long id);
 
     /**
      * 更新version字段

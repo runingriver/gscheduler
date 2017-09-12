@@ -1,4 +1,4 @@
-package org.gscheduler.service.jober;
+package org.gscheduler.service.executor;
 
 import java.util.Date;
 import java.util.List;

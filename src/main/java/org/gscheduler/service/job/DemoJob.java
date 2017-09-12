@@ -2,7 +2,7 @@ package org.gscheduler.service.job;
 
 import java.util.concurrent.TimeUnit;
 
-import org.gscheduler.service.jober.JobProcess;
+import org.gscheduler.service.executor.JobProcess;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

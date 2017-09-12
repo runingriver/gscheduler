@@ -87,28 +87,6 @@ public class Utils {
     }
 
     /**
-     * 将Date转为String
-     *
-     * @param date         Date
-     * @param defaultValue 默认时间
-     * @param format       null-yyyy-MM-dd HH:mm:ss
-     * @return
-     */
-    public static String dateToString(Date date, String defaultValue, String format) {
-        if (StringUtils.isBlank(format)) {
-            format = "yyyy-MM-dd HH:mm:ss";
-        }
-        String result = defaultValue;
-        try {
-            result = dateToString(date, format);
-        } catch (Exception e) {
-            // 异常则使用默认字符串
-            // logger.error("parse date exception");
-        }
-        return result;
-    }
-
-    /**
      * 将时间转换成指定的格式
      */
     public static String dateToString(Date date, String format) {

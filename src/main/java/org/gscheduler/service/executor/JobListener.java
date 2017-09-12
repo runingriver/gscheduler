@@ -1,4 +1,4 @@
-package org.gscheduler.service.jober;
+package org.gscheduler.service.executor;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
@@ -46,10 +46,10 @@ public class JobListener {
     @Resource
     JobInfoService jobInfoService;
 
-    @Value("zookeeper.failover.tolerate.time")
+    @Value("${zookeeper.failover.tolerate.time}")
     String zkFailoverTolerateTime;
 
-    @Value("zookeeper.lock.tolerate.time")
+    @Value("${zookeeper.lock.tolerate.time}")
     String zkLockTolerateTime;
 
     private ZkHelper.ZKClient zkClient;
@@ -116,7 +116,7 @@ public class JobListener {
             //检查并设置任务监听
             List<JobInfo> scheduleList = jobInfoService.getAllJobInfo();
             for (JobInfo jobInfo : scheduleList) {
-                String nodePath = SERVICE_UPDATE_PATH + "/" + jobInfo.getTaskName();
+                String nodePath = SERVICE_UPDATE_PATH + "/" + jobInfo.getJobName();
 
                 //检查是否所有节点存在
                 boolean existed = zkClient.checkNodeExisted(nodePath);
@@ -453,7 +453,7 @@ public class JobListener {
                     //更新zk
                     jobInfo.setFailExecuteHost(Utils.getHostName());
                     String jobJson = JobListener.createJobJson(jobInfo, JobManager.JobOperator.NONE);
-                    String nodePath = JobListener.SERVICE_UPDATE_PATH + "/" + jobInfo.getTaskName();
+                    String nodePath = JobListener.SERVICE_UPDATE_PATH + "/" + jobInfo.getJobName();
                     zkClient.setData(nodePath, jobJson.getBytes());
 
                     jobManager.initJobScheduler(jobInfo).startAsync().awaitRunning();

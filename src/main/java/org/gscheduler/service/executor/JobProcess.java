@@ -1,4 +1,4 @@
-package org.gscheduler.service.jober;
+package org.gscheduler.service.executor;
 
 /**
  * 定时任务实现接口,任何定时任务必须实现此接口

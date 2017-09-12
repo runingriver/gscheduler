@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="org.gscheduler.dao.task.JobInfoDao">
+<mapper namespace="org.gscheduler.dao.JobInfoDao">
     <sql id="jobInfoField">
-        id,task_name,task_class,parent_name,sub_task,task_version,config_parameter,crontab,initiate_mode,
+        id,job_name,job_class,parent_name,sub_job,job_version,config_parameter,crontab,initiate_mode,
         host_list,execute_host,fail_execute_host,version,execute_status,execute_time,
         last_execute_time,next_execute_time,update_time
     </sql>
@@ -24,7 +24,7 @@
         SELECT
         <include refid="jobInfoField"/>
         FROM job_info
-        WHERE task_class = #{name}
+        WHERE job_class = #{name}
     </select>
 
     <select id="selectJobInfoByHostname" parameterType="string" resultType="JobInfo">
@@ -48,16 +48,16 @@
         WHERE id=#{id}
     </select>
 
-    <select id="selectCrontabByTaskClass" resultType="string">
+    <select id="selectCrontabByJobClass" resultType="string">
         SELECT crontab FROM job_info
         WHERE job_class = #{jobClass}
     </select>
 
-    <select id="selectJobInfoByTaskName" parameterType="string" resultType="JobInfo">
+    <select id="selectJobInfoByJobName" parameterType="string" resultType="JobInfo">
         SELECT
         <include refid="jobInfoField"/>
-        FROM task_schedule
-        WHERE task_name=#{taskName}
+        FROM job_info
+        WHERE job_name=#{jobName}
     </select>
 
     <update id="updateJobInfoById">
@@ -68,10 +68,10 @@
 
     <sql id="jobInfoFieldSet">
         <set>
-            <if test="taskName!=null and taskName!=''">task_name=#{taskName},</if>
-            <if test="taskClass!=null and taskClass!=''">task_class=#{taskClass},</if>
+            <if test="jobName!=null and jobName!=''">job_name=#{jobName},</if>
+            <if test="jobClass!=null and jobClass!=''">job_class=#{jobClass},</if>
             <if test="parentName!=null">parent_name=#{parentName},</if>
-            <if test="subTask!=null">sub_task=#{subTask},</if>
+            <if test="subJob!=null">sub_job=#{subJob},</if>
             <if test="configParameter!=null">config_parameter=#{configParameter},</if>
             <if test="crontab!=null">crontab=#{crontab},</if>
             <if test="initiateMode gte 0">initiate_mode=#{initiateMode},</if>
@@ -81,20 +81,20 @@
         </set>
     </sql>
 
-    <update id="updateTaskVersion">
+    <update id="updateJobVersion">
         UPDATE job_info
         SET version = version + 1
         WHERE id=#{id}
     </update>
 
     <update id="updateVersion">
-        UPDATE task_schedule
+        UPDATE job_info
         SET version = #{version}
         WHERE id=#{id}
     </update>
 
     <update id="updateFailExecuteHost">
-        UPDATE task_schedule
+        UPDATE job_info
         SET fail_execute_host = #{failExecuteHost}
         WHERE id=#{id}
     </update>

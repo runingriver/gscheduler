@@ -1,4 +1,4 @@
-package org.gscheduler.service.jober;
+package org.gscheduler.service.executor;
 
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.Service;
@@ -34,7 +34,7 @@ public class JobWatcher {
     @Resource
     JobListener jobListener;
 
-    @Value("job.heartbeat")
+    @Value("${job.heartbeat}")
     String jobHeartbeat;
 
     // 心跳频率
@@ -113,7 +113,7 @@ public class JobWatcher {
                 Service.State state = jobScheduler.state();
                 if (state == Service.State.NEW || state == Service.State.STARTING
                         || state == Service.State.RUNNING) {
-                    logger.info("Watcher:task:{},task id disabled but is running,terminate task right now.", jobInfo.getTaskName());
+                    logger.info("Watcher:task:{},task id disabled but is running,terminate task right now.", jobInfo.getJobName());
                     jobInfoService.modifyInitiateMode(jobInfo.getId(), JobManager.DISABLE);
                     jobManager.stopSchedule(jobInfo.getId());
                 }
@@ -128,7 +128,7 @@ public class JobWatcher {
                 }
             }
             // 任务不存在或任务不在正常State,重新启动任务
-            logger.info("Watcher:task:{},task is enabled but not running,start right now.", jobInfo.getTaskName());
+            logger.info("Watcher:task:{},task is enabled but not running,start right now.", jobInfo.getJobName());
             jobManager.startSchedule(jobInfo.getId());
         }
     }
@@ -184,19 +184,19 @@ public class JobWatcher {
             }
 
             Long id = jobInfo.getId();
-            if (subTaskVersionMap.containsKey(id) && subTaskVersionMap.get(id) >= jobInfo.getTaskVersion()) {
+            if (subTaskVersionMap.containsKey(id) && subTaskVersionMap.get(id) >= jobInfo.getJobVersion()) {
                 //logger.info("Do not meet execute condition,ignore.");
                 continue;
             }
 
             //如果是首次加入,监测,则第一次不执行
             if (!subTaskVersionMap.containsKey(id)) {
-                subTaskVersionMap.put(id, jobInfo.getTaskVersion());
+                subTaskVersionMap.put(id, jobInfo.getJobVersion());
                 continue;
             }
 
             logger.info("execute local sub job:{}", jobInfo.toString());
-            subTaskVersionMap.put(id, jobInfo.getTaskVersion());
+            subTaskVersionMap.put(id, jobInfo.getJobVersion());
             if (jobSchedulerMaps.containsKey(id)) {
                 jobManager.startSchedule(id);
             } else {

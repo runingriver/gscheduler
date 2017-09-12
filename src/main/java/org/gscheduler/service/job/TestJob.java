@@ -1,14 +1,16 @@
 package org.gscheduler.service.job;
 
-import org.gscheduler.service.jober.JobProcess;
+import org.gscheduler.service.executor.JobProcess;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
 
 /**
  * 测试任务
  */
+@Component
 public class TestJob implements JobProcess {
     private static final Logger logger = LoggerFactory.getLogger(TestJob.class);
 

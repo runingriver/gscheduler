@@ -6,7 +6,7 @@ import java.util.List;
 import org.gscheduler.entity.JobInfo;
 
 /**
- * 任务调度 Created by zongzhehu on 16-12-26.
+ * 任务调度
  */
 public interface JobInfoService {
 
@@ -28,7 +28,7 @@ public interface JobInfoService {
     /**
      * 根据任务名获取job
      */
-    JobInfo getJobInfoByTaskName(String taskName);
+    JobInfo getJobInfoByJobName(String jobName);
 
     /**
      * 根据id获取Job
@@ -45,7 +45,7 @@ public interface JobInfoService {
 
     /**
      * 更新job
-     * @param jobInfo
+     * @param jobInfo jobInfo
      */
     void modifyJobInfo(JobInfo jobInfo);
 
@@ -63,7 +63,7 @@ public interface JobInfoService {
 
     void startJobInfo(long id);
 
-    void modifySubTaskVersion(long id);
+    void modifySubJobVersion(long id);
 
     void modifyVersion(long id, long value);
 

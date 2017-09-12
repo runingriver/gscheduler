@@ -4,11 +4,11 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper.CreateMode;
 import org.gscheduler.commons.ZkHelper;
-import org.gscheduler.dao.task.JobInfoDao;
+import org.gscheduler.dao.JobInfoDao;
 import org.gscheduler.entity.JobInfo;
 import org.gscheduler.exception.SqlOperationException;
-import org.gscheduler.service.jober.JobListener;
-import org.gscheduler.service.jober.JobManager;
+import org.gscheduler.service.executor.JobListener;
+import org.gscheduler.service.executor.JobManager;
 import org.gscheduler.service.task.JobInfoService;
 import org.gscheduler.utils.Utils;
 import org.slf4j.Logger;
@@ -38,17 +38,17 @@ public class JobInfoServiceImpl implements JobInfoService {
     JobManager jobManager;
 
     public List<JobInfo> getAllJobInfo() {
-        List<JobInfo> jobInfos = jobInfoDao.selectAllJobInfo();
+        List<JobInfo> jobInfoList = jobInfoDao.selectAllJobInfo();
 
         // 如果集合为空,返回一个空集合
-        return CollectionUtils.isEmpty(jobInfos) ? Collections.<JobInfo>emptyList() : jobInfos;
+        return CollectionUtils.isEmpty(jobInfoList) ? Collections.<JobInfo>emptyList() : jobInfoList;
     }
 
     public List<JobInfo> getLocalJobInfo() {
         String hostname = Utils.getHostName();
-        List<JobInfo> jobInfos = jobInfoDao.selectJobInfoByHostname(hostname);
+        List<JobInfo> jobInfoList = jobInfoDao.selectJobInfoByHostname(hostname);
 
-        return CollectionUtils.isEmpty(jobInfos) ? Collections.<JobInfo>emptyList() : jobInfos;
+        return CollectionUtils.isEmpty(jobInfoList) ? Collections.<JobInfo>emptyList() : jobInfoList;
     }
 
     public List<JobInfo> getJobInfoContainHostname() {
@@ -76,11 +76,11 @@ public class JobInfoServiceImpl implements JobInfoService {
         return jobInfo;
     }
 
-    public JobInfo getJobInfoByTaskName(String taskName) {
+    public JobInfo getJobInfoByJobName(String taskName) {
         Preconditions.checkArgument(StringUtils.isNotBlank(taskName), "argument taskName illegal");
         JobInfo jobInfo = null;
         try {
-            jobInfo = jobInfoDao.selectJobInfoByTaskName(taskName.trim());
+            jobInfo = jobInfoDao.selectJobInfoByJobName(taskName.trim());
         } catch (Exception e) {
             logger.error("select jobInfo by taskName exception.taskName:{}", taskName);
         }
@@ -97,7 +97,7 @@ public class JobInfoServiceImpl implements JobInfoService {
         String parentName = jobInfo.getParentName();
         //更新父task的sub_task字段
         if (StringUtils.isNotBlank(parentName)) {
-            JobInfo parentSchedule = jobInfoDao.selectJobInfoByTaskName(parentName);
+            JobInfo parentSchedule = jobInfoDao.selectJobInfoByJobName(parentName);
             //存在父任务,则更新父任务的sub_task,否则置本task的parentTask为空
             if (parentSchedule != null) {
                 String idString = String.valueOf(id);
@@ -106,13 +106,13 @@ public class JobInfoServiceImpl implements JobInfoService {
                 ts.setId(parentSchedule.getId());
 
                 try {
-                    if (StringUtils.isBlank(parentSchedule.getSubTask())) {
-                        ts.setSubTask(idString);
+                    if (StringUtils.isBlank(parentSchedule.getSubJob())) {
+                        ts.setSubJob(idString);
                         ts.setInitiateMode(parentSchedule.getInitiateMode());
                         jobInfoDao.updateJobInfoById(ts);
-                    } else if (!parentSchedule.getSubTask().contains(idString)) {
-                        idString = parentSchedule.getSubTask() + ',' + idString;
-                        ts.setSubTask(idString);
+                    } else if (!parentSchedule.getSubJob().contains(idString)) {
+                        idString = parentSchedule.getSubJob() + ',' + idString;
+                        ts.setSubJob(idString);
                         jobInfoDao.updateJobInfoById(ts);
                     }
                 } catch (Exception e) {
@@ -151,14 +151,14 @@ public class JobInfoServiceImpl implements JobInfoService {
 
         if (isParamChanged || isCronChanged || isExeHostChanged || isInitModeChanged) {
             if (jobManager.getIsUsedZKListener()) {
-                logger.info("task changed update and notify zookeeper.name:{}", jobInfo.getTaskName());
+                logger.info("task changed update and notify zookeeper.name:{}", jobInfo.getJobName());
                 //FailExecuteHost参数不会被修改
                 jobInfo.setFailExecuteHost(oldSchedule.getFailExecuteHost());
                 notifyZooKeeper(jobInfo, JobManager.JobOperator.STOP_OR_START);
             } else {
                 if (StringUtils.equals(jobInfo.getExecuteHost(), Utils.getHostName())
                         && jobInfo.getInitiateMode() == JobManager.AVAILABLE) {
-                    logger.info("local job restart job,name:{}", jobInfo.getTaskName());
+                    logger.info("local job restart job,name:{}", jobInfo.getJobName());
                     jobManager.restartSchedule(id);
                 }
             }
@@ -170,7 +170,7 @@ public class JobInfoServiceImpl implements JobInfoService {
             jobInfo.setFailExecuteHost("");
         }
         String jobJson = JobListener.createJobJson(jobInfo, operator);
-        String nodePath = JobListener.SERVICE_UPDATE_PATH + "/" + jobInfo.getTaskName();
+        String nodePath = JobListener.SERVICE_UPDATE_PATH + "/" + jobInfo.getJobName();
 
         zkHelper.getDefaultZKClient().setData(nodePath, jobJson.getBytes());
     }
@@ -185,7 +185,7 @@ public class JobInfoServiceImpl implements JobInfoService {
             notifyZooKeeper(jobInfo, JobManager.JobOperator.STOP);
         } else {
             if (StringUtils.equals(jobInfo.getExecuteHost(), Utils.getHostName())) {
-                logger.info("stop local job,name:{}", jobInfo.getTaskName());
+                logger.info("stop local job,name:{}", jobInfo.getJobName());
                 jobManager.stopSchedule(id);
             }
         }
@@ -201,13 +201,13 @@ public class JobInfoServiceImpl implements JobInfoService {
             notifyZooKeeper(jobInfo, JobManager.JobOperator.START);
         } else {
             if (StringUtils.equals(jobInfo.getExecuteHost(), Utils.getHostName())) {
-                logger.info("start local job,name:{}", jobInfo.getTaskName());
+                logger.info("start local job,name:{}", jobInfo.getJobName());
                 jobManager.startSchedule(id);
             }
         }
     }
 
-    public void modifySubTaskVersion(long id) {
+    public void modifySubJobVersion(long id) {
         Preconditions.checkNotNull(id > 0, "argument jobInfo illegal.");
         logger.info("notify sub task:{}", id);
         if (jobManager.getIsUsedZKListener()) {
@@ -215,7 +215,7 @@ public class JobInfoServiceImpl implements JobInfoService {
         } else {
             //db pull通知
             try {
-                jobInfoDao.updateTaskVersion(id);
+                jobInfoDao.updateJobVersion(id);
             } catch (RuntimeException e) {
                 throw new SqlOperationException("添加定时任务JobInfo失败.", id, e);
             }
@@ -238,7 +238,7 @@ public class JobInfoServiceImpl implements JobInfoService {
 
         if (jobManager.getIsUsedZKListener()) {
             //新增一个job,注册到zk上,如果是本地任务执行任务,添加监听
-            String nodePath = JobListener.SERVICE_UPDATE_PATH + "/" + jobInfo.getTaskName();
+            String nodePath = JobListener.SERVICE_UPDATE_PATH + "/" + jobInfo.getJobName();
             logger.info("add job,update zk,jobSchedule:{},path:{}", jobInfo.toString(), nodePath);
 
             String jobJson = JobListener.createJobJson(jobInfo, JobManager.JobOperator.START);
@@ -246,7 +246,7 @@ public class JobInfoServiceImpl implements JobInfoService {
         } else {
             if (StringUtils.equals(jobInfo.getExecuteHost(), Utils.getHostName())
                     && jobInfo.getInitiateMode() == JobManager.AVAILABLE) {
-                logger.info("start local job,name:{}", jobInfo.getTaskName());
+                logger.info("start local job,name:{}", jobInfo.getJobName());
                 jobManager.startSchedule(jobInfo.getId());
             }
         }
@@ -263,13 +263,13 @@ public class JobInfoServiceImpl implements JobInfoService {
         }
 
         if (jobManager.getIsUsedZKListener()) {
-            String nodePath = JobListener.SERVICE_UPDATE_PATH + "/" + jobInfo.getTaskName();
+            String nodePath = JobListener.SERVICE_UPDATE_PATH + "/" + jobInfo.getJobName();
             logger.info("remove node,update zk,task:{},path:{}", jobInfo.toString(), nodePath);
             //移除节点
             zkHelper.getDefaultZKClient().deleteNode(nodePath);
         } else {
             if (StringUtils.equals(jobInfo.getExecuteHost(), Utils.getHostName())) {
-                logger.info("remove local job,name:{}", jobInfo.getTaskName());
+                logger.info("remove local job,name:{}", jobInfo.getJobName());
                 jobManager.killSchedule(jobInfo.getId());
             }
         }

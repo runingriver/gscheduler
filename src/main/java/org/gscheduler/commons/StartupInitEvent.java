@@ -1,6 +1,6 @@
 package org.gscheduler.commons;
 
-import org.gscheduler.service.jober.JobManager;
+import org.gscheduler.service.executor.JobManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationListener;

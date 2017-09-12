@@ -1,7 +1,8 @@
 package org.gscheduler.web.controller;
 
+import org.apache.commons.lang3.StringUtils;
 import org.gscheduler.entity.JobInfo;
-import org.gscheduler.service.jober.JobManager;
+import org.gscheduler.service.executor.JobManager;
 import org.gscheduler.service.task.JobInfoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.ModelAndView;
 
 import javax.annotation.Resource;
@@ -48,7 +50,7 @@ public class JobInfoController {
     // 更新任务
     @RequestMapping(value = "/job/update")
     public String updateJob(@ModelAttribute("jobSchedule") JobInfo jobInfo) {
-        logger.info("Manually,update the job:{}...", jobInfo.getTaskName());
+        logger.info("Manually,update the job:{}...", jobInfo.getJobName());
         // 修改数据库
         trimFields(jobInfo);
         jobInfoService.modifyJobInfo(jobInfo);
@@ -57,7 +59,7 @@ public class JobInfoController {
     }
 
     private void trimFields(@ModelAttribute("jobInfo") JobInfo jobInfo) {
-        jobInfo.setTaskClass(jobInfo.getTaskClass().trim());
+        jobInfo.setJobClass(jobInfo.getJobClass().trim());
         jobInfo.setConfigParameter(jobInfo.getConfigParameter().trim());
         jobInfo.setCrontab(jobInfo.getCrontab().trim());
         jobInfo.setHostList(jobInfo.getHostList().trim());
@@ -103,6 +105,26 @@ public class JobInfoController {
         logger.info("Manually, open the job:{}...", id);
         jobManager.startSchedule(id);
         return "redirect:/job/list";
+    }
+
+    @ResponseBody
+    @RequestMapping(value = "/task/zookeeper/listener/{used}")
+    public String usedZKListener(@PathVariable("used") String used) {
+        if (StringUtils.isBlank(used)) {
+            return "param is empty.";
+        }
+        if (StringUtils.equals("true", used)) {
+            jobManager.setIsUsedZKListener(true);
+            logger.info("set used zk to true.");
+            return "set used zk to true.";
+        }
+
+        if (StringUtils.equals("false", used)) {
+            jobManager.setIsUsedZKListener(false);
+            logger.info("set used zk to false.");
+            return "set used zk to false.";
+        }
+        return "param error";
     }
 
     /*-------------------仅用作跳转-----------------------------*/
